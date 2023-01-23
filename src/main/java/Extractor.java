@@ -1,14 +1,13 @@
 import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.text.PDFTextStripper;
-import org.apache.pdfbox.text.PDFTextStripperByArea;
 
-import java.awt.geom.Rectangle2D;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,24 +24,36 @@ public class Extractor {
 		}
 	}
 
-	public static void main(String[] args) {
-		try {
-			URL pdfUrl = new URL("https://www.danistay.gov.tr/assets/pdf/yayinlar/dergi/15_03_2019_015742.pdf");
-			InputStream in = pdfUrl.openStream();
-			BufferedInputStream bf = new BufferedInputStream(in);
-			PDDocument doc = PDDocument.load(bf);
-			ArrayList <Integer> sectionPages = getSectionPages(doc);
-			for (int i = 0; i < sectionPages.size()-1; i++) {
-				getText(( sectionPages.get(i)),sectionPages.get(i+1),doc);
+	public static void main(String[] args) throws MalformedURLException {
+		DBConnector.createDB();
+		System.out.println("Starting extraction of judgements");
+		ArrayList<URL> urlList= new ArrayList<>();
+		urlList.add(new URL("https://www.danistay.gov.tr/assets/pdf/yayinlar/dergi/15_03_2019_015742.pdf"));
+		urlList.add(new URL("https://www.danistay.gov.tr/assets/pdf/yayinlar/dergi/23_10_2020_095628.pdf"));
+		for (int i = 0; i < urlList.size(); i++) {
+			try {
+
+				URL pdfUrl = urlList.get(i);
+				InputStream in = pdfUrl.openStream();
+				BufferedInputStream bf = new BufferedInputStream(in);
+				PDDocument doc = PDDocument.load(bf);
+				ArrayList <Integer> sectionPages = getSectionPages(doc);
+				for (int j = 0; j < sectionPages.size()-1; j++) {
+					PreparedStatement Pstmt = DBConnector.createConnection();
+					getText(sectionPages.get(i),sectionPages.get(i + 1),doc,Pstmt);
+				}
+
+
+
+			} catch (MalformedURLException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (SQLException throwables) {
+				throwables.printStackTrace();
 			}
-
-
-
-		} catch (MalformedURLException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
 		}
+		System.out.println("Finished extraction of judgements");
 	}
 	public static ArrayList getSectionPages(PDDocument doc ) throws IOException {
 
@@ -52,7 +63,7 @@ public class Extractor {
 
 		//Retrieving text from PDF document
 		String text = pdfStripper.getText(doc);
-		int start = text.indexOf("JUDGEMENTS OF TURKISH COUNCIL OF STATE WHICH REFER");
+		int start = text.indexOf("JUDGEMENTS OF TURKISH COUNCIL OF STATE");
 		int end = text.indexOf("Publications of Turkish Council of State");
 		text = text.substring(start,end);
 
@@ -71,10 +82,9 @@ public class Extractor {
 		 * Note: The English judgement is being removed.
 		 */
 		sectionPages.remove(0);
-
 		return sectionPages;
 	}
-	public static void getText(int start, int stop, PDDocument doc) throws IOException {
+	public static void getText(int start, int stop, PDDocument doc,PreparedStatement Pstmt) throws IOException, SQLException {
 		PDFTextStripper stripper =  new PDFTextStripper();
 		stripper.setStartPage(start);
 		stripper.setEndPage(stop-1);
@@ -82,6 +92,7 @@ public class Extractor {
 		String text = stripper.getText(doc);
 		int textStart = text.indexOf("T.C.");
 		text = text.substring(textStart);
+
 
 		String kararNo = "Karar No : \\s*(\\d+/\\d+)";
 		String Daire = "(.*) Daire";
@@ -100,24 +111,31 @@ public class Extractor {
 			Matcher matcher3 = pattern3.matcher(judgment);
 
 			while (matcher1.find() && matcher2.find() && matcher3.find()) {
-				String decisionNumber = matcher1.group(1);
+
 				String chamber = matcher2.group(1) +" Daire";
+				Pstmt.setString(1,chamber);
+
 				String docketNumber = matcher3.group(1);
-				System.out.println("Decision Number: " + decisionNumber);
-				System.out.println("Chamber: " + chamber);
-				System.out.println("Docket Number: " + docketNumber);
+				Pstmt.setString(2,docketNumber);
+
+				String decisionNumber = matcher1.group(1);
+				Pstmt.setString(3,decisionNumber);
+
+
 				int judgmentStart = judgment.indexOf("Anahtar Kelimeler :");
+				if(judgmentStart == -1){
+					judgmentStart = judgment.indexOf("Anahtar Kelimeler:");
+				}
 				judgment= judgment.substring(judgmentStart);
-				System.out.println("Judgment:" + judgment);
-				System.out.println("------------------------------------------------");
+				Pstmt.setString(4,judgment);
+
+				Pstmt.executeUpdate();
 			}
 
 
 		}
 
 	}
-	public static void saveJudgement(String chamber){
 
-	}
 }
 
