@@ -38,9 +38,11 @@ public class Extractor {
 				BufferedInputStream bf = new BufferedInputStream(in);
 				PDDocument doc = PDDocument.load(bf);
 				ArrayList <Integer> sectionPages = getSectionPages(doc);
+				
+				PreparedStatement Pstmt = DBConnector.createConnection();
+
 				for (int j = 0; j < sectionPages.size()-1; j++) {
-					PreparedStatement Pstmt = DBConnector.createConnection();
-					getText(sectionPages.get(i),sectionPages.get(i + 1),doc,Pstmt);
+					getText(sectionPages.get(j),sectionPages.get(j + 1),doc,Pstmt);
 				}
 
 
