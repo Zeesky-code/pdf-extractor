@@ -1,6 +1,9 @@
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.text.PDFTextStripperByArea;
 
+import java.awt.geom.Rectangle2D;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,12 +40,13 @@ public class Extractor {
 				InputStream in = pdfUrl.openStream();
 				BufferedInputStream bf = new BufferedInputStream(in);
 				PDDocument doc = PDDocument.load(bf);
+
 				ArrayList <Integer> sectionPages = getSectionPages(doc);
 				
 				PreparedStatement Pstmt = DBConnector.createConnection();
 
 				for (int j = 0; j < sectionPages.size()-1; j++) {
-					getText(sectionPages.get(j),sectionPages.get(j + 1),doc,Pstmt);
+					getText((sectionPages.get(j)) -1,(sectionPages.get(j + 1))-1,doc,Pstmt);
 				}
 
 
@@ -87,20 +91,31 @@ public class Extractor {
 		return sectionPages;
 	}
 	public static void getText(int start, int stop, PDDocument doc,PreparedStatement Pstmt) throws IOException, SQLException {
-		PDFTextStripper stripper =  new PDFTextStripper();
-		stripper.setStartPage(start);
-		stripper.setEndPage(stop-1);
+		Rectangle2D region = new Rectangle2D.Double(0, 70, 603.84, 800.24);
+		String fulltext= "";
+		for (int j = start ; j<stop ; j++) {
+			PDPage page = doc.getPage(j);
+			String regionName = "region";
+			PDFTextStripperByArea stripper = new PDFTextStripperByArea();
+			stripper.addRegion(regionName, region);
+			stripper.extractRegions(page);
+			String text = stripper.getTextForRegion("region");
+			String pattern =  "Dan.*"+(j+1);
+			text = text.replaceAll(pattern, "");
+			pattern =  (j+1)+" Dan.*\\d";
+			text = text.replaceAll(pattern, "");
+			fulltext+=text;
+		}
 
-		String text = stripper.getText(doc);
-		int textStart = text.indexOf("T.C.");
-		text = text.substring(textStart);
+		int textStart = fulltext.indexOf("T.C.");
+		fulltext = fulltext.substring(textStart);
 
 
 		String kararNo = "Karar No : \\s*(\\d+/\\d+)";
 		String Daire = "(.*) Daire";
 		String esasNo = "Esas No : \\s*(\\d+/\\d+)";
 
-		String[] judgments = text.split("T.C.\\n*\\s*(.*)");
+		String[] judgments = fulltext.split("T.C.\\n*\\s*(.*)");
 
 		for (String judgment : judgments) {
 			Pattern pattern1 = Pattern.compile(kararNo);
