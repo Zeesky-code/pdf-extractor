@@ -107,12 +107,8 @@ public class Extractor {
 			fulltext+=text;
 		}
 
-		int textStart = fulltext.indexOf("T.C.");
-		fulltext = fulltext.substring(textStart);
-
-
 		String kararNo = "Karar No : \\s*(\\d+/\\d+)";
-		String Daire = "(.*) Daire";
+		String Daire = "(.*)\\s*Esas No";
 		String esasNo = "Esas No : \\s*(\\d+/\\d+)";
 
 		String[] judgments = fulltext.split("T.C.\\n*\\s*(.*)");
@@ -129,7 +125,8 @@ public class Extractor {
 
 			while (matcher1.find() && matcher2.find() && matcher3.find()) {
 
-				String chamber = matcher2.group(1) +" Daire";
+				String chamber = matcher2.group(1);
+				System.out.println(matcher2.group(1));
 				Pstmt.setString(1,chamber);
 
 				String docketNumber = matcher3.group(1);
